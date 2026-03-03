@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
 const pool = require('./db');
@@ -11,9 +12,17 @@ const { startChecker } = require('./jobs/checker');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use(cors());
 app.use(express.json());
 
+app.use('/api', apiLimiter);
 app.use('/api/monitors', monitorsRouter);
 app.use('/api/monitors/:id/checks', checksRouter);
 
