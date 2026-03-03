@@ -24,7 +24,7 @@ A lightweight, self-hosted server and web monitoring application. Track uptime a
 ## Quick Start (Docker)
 
 ```bash
-git clone https://github.com/your-org/OpenMonitor.git
+git clone https://github.com/your-org/OpenMonitor.git  # replace with your repo URL
 cd OpenMonitor
 docker compose up --build
 ```

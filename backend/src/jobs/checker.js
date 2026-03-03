@@ -10,10 +10,14 @@ async function checkMonitor(monitor) {
   let error = null;
 
   try {
-    const response = await fetch(monitor.url, {
-      redirect: 'follow',
-      timeout: 15000,
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    let response;
+    try {
+      response = await fetch(monitor.url, { redirect: 'follow', signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
     status_code = response.status;
     response_time_ms = Date.now() - start;
     is_up = status_code >= 200 && status_code < 400;
