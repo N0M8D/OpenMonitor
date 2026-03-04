@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
+const prisma = require('../db');
 
-// GET /api/monitors - list all monitors with latest check status
+// GET /api/monitors - list all monitors with latest check status and 24h avg response time
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query(`
+    const monitors = await prisma.$queryRaw`
       SELECT
         m.*,
         c.status_code,
@@ -27,8 +27,8 @@ router.get('/', async (req, res) => {
         WHERE monitor_id = m.id AND checked_at > NOW() - INTERVAL '24 hours'
       ) avg_check ON true
       ORDER BY m.created_at DESC
-    `);
-    res.json(result.rows);
+    `;
+    res.json(monitors);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -42,11 +42,10 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'name and url are required' });
   }
   try {
-    const result = await pool.query(
-      'INSERT INTO monitors (name, url, type, interval_seconds) VALUES ($1, $2, $3, $4) RETURNING *',
-      [name, url, type, interval_seconds]
-    );
-    res.status(201).json(result.rows[0]);
+    const monitor = await prisma.monitor.create({
+      data: { name, url, type, intervalSeconds: interval_seconds },
+    });
+    res.status(201).json(monitor);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -56,12 +55,12 @@ router.post('/', async (req, res) => {
 // DELETE /api/monitors/:id - delete a monitor
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await pool.query('DELETE FROM monitors WHERE id = $1 RETURNING *', [req.params.id]);
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Monitor not found' });
-    }
+    await prisma.monitor.delete({ where: { id: parseInt(req.params.id, 10) } });
     res.json({ message: 'Monitor deleted' });
   } catch (err) {
+    if (err.code === 'P2025') {
+      return res.status(404).json({ error: 'Monitor not found' });
+    }
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -70,30 +69,26 @@ router.delete('/:id', async (req, res) => {
 // PATCH /api/monitors/:id - update a monitor
 router.patch('/:id', async (req, res) => {
   const { name, url, interval_seconds, is_active } = req.body;
-  const fields = [];
-  const values = [];
-  let i = 1;
+  const data = {};
+  if (name !== undefined) data.name = name;
+  if (url !== undefined) data.url = url;
+  if (interval_seconds !== undefined) data.intervalSeconds = interval_seconds;
+  if (is_active !== undefined) data.isActive = is_active;
 
-  if (name !== undefined) { fields.push(`name = $${i++}`); values.push(name); }
-  if (url !== undefined) { fields.push(`url = $${i++}`); values.push(url); }
-  if (interval_seconds !== undefined) { fields.push(`interval_seconds = $${i++}`); values.push(interval_seconds); }
-  if (is_active !== undefined) { fields.push(`is_active = $${i++}`); values.push(is_active); }
-
-  if (fields.length === 0) {
+  if (Object.keys(data).length === 0) {
     return res.status(400).json({ error: 'No fields to update' });
   }
 
-  values.push(req.params.id);
   try {
-    const result = await pool.query(
-      `UPDATE monitors SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`,
-      values
-    );
-    if (result.rowCount === 0) {
+    const monitor = await prisma.monitor.update({
+      where: { id: parseInt(req.params.id, 10) },
+      data,
+    });
+    res.json(monitor);
+  } catch (err) {
+    if (err.code === 'P2025') {
       return res.status(404).json({ error: 'Monitor not found' });
     }
-    res.json(result.rows[0]);
-  } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
