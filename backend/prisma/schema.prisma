@@ -1,0 +1,38 @@
+// This is the Prisma schema for OpenMonitor.
+// Manage and evolve the data model here; apply changes with `prisma migrate dev`.
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Monitor {
+  id              Int      @id @default(autoincrement())
+  name            String   @db.VarChar(255)
+  url             String   @db.VarChar(2048)
+  type            String   @default("web") @db.VarChar(50)
+  intervalSeconds Int      @default(60) @map("interval_seconds")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  checks          Check[]
+
+  @@map("monitors")
+}
+
+model Check {
+  id             Int      @id @default(autoincrement())
+  monitorId      Int      @map("monitor_id")
+  checkedAt      DateTime @default(now()) @map("checked_at") @db.Timestamptz()
+  statusCode     Int?     @map("status_code")
+  responseTimeMs Int?     @map("response_time_ms")
+  isUp           Boolean  @map("is_up")
+  error          String?
+
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@map("checks")
+}
