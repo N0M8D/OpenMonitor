@@ -14,7 +14,7 @@ A lightweight, self-hosted server and web monitoring application. Track uptime a
 
 | Layer     | Technology                          |
 |-----------|-------------------------------------|
-| Backend   | Node.js, Express, node-cron, pg     |
+| Backend   | Node.js, Express, node-cron, Prisma |
 | Database  | PostgreSQL 16                       |
 | Frontend  | React 18, Vite, recharts            |
 | Container | Docker Compose, nginx               |
@@ -45,7 +45,6 @@ docker compose up --build
 
 ```bash
 createdb openmonitor
-psql openmonitor < backend/src/migrations/001_initial.sql
 ```
 
 ### Backend
@@ -55,6 +54,7 @@ cd backend
 cp src/.env.example .env
 # Edit .env with your DATABASE_URL if needed
 npm install
+npm run migrate
 npm start
 ```
 
