@@ -11,14 +11,23 @@ generator client {
 }
 
 model Monitor {
-  id              Int      @id @default(autoincrement())
-  name            String   @db.VarChar(255)
-  url             String   @db.VarChar(2048)
-  type            String   @default("web") @db.VarChar(50)
-  intervalSeconds Int      @default(60) @map("interval_seconds")
-  isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  checks          Check[]
+  id                  Int       @id @default(autoincrement())
+  name                String    @db.VarChar(255)
+  url                 String    @db.VarChar(2048)
+  type                String    @default("web") @db.VarChar(50)
+  intervalSeconds     Int       @default(60) @map("interval_seconds")
+  isActive            Boolean   @default(true) @map("is_active")
+  webhookUrl          String?   @map("webhook_url") @db.VarChar(2048)
+  secretToken         String?   @unique @map("secret_token") @db.VarChar(64)
+  lastHeartbeatAt     DateTime? @map("last_heartbeat_at") @db.Timestamptz()
+  method              String    @default("GET") @map("method") @db.VarChar(10)
+  requestHeaders      Json?     @map("request_headers")
+  requestBody         String?   @map("request_body")
+  expectedStatusCodes String?   @map("expected_status_codes") @db.VarChar(100)
+  assertJsonPath      String?   @map("assert_json_path") @db.VarChar(500)
+  assertJsonValue     String?   @map("assert_json_value") @db.VarChar(500)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  checks              Check[]
 
   @@map("monitors")
 }
@@ -31,6 +40,7 @@ model Check {
   responseTimeMs Int?     @map("response_time_ms")
   isUp           Boolean  @map("is_up")
   error          String?
+  metadata       Json?
 
   monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
 

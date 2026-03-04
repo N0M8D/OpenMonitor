@@ -14,5 +14,9 @@ async function request(path, options = {}) {
 
 export const getMonitors = () => request('/api/monitors');
 export const createMonitor = (data) => request('/api/monitors', { method: 'POST', body: JSON.stringify(data) });
+export const updateMonitor = (id, data) => request(`/api/monitors/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 export const deleteMonitor = (id) => request(`/api/monitors/${id}`, { method: 'DELETE' });
 export const getChecks = (monitorId) => request(`/api/monitors/${monitorId}/checks`);
+export const testWebhook = (webhookUrl) => request('/api/webhooks/test', { method: 'POST', body: JSON.stringify({ webhook_url: webhookUrl }) });
+export const regenerateToken = (id) => request(`/api/monitors/${id}/regenerate-token`, { method: 'POST' });
+

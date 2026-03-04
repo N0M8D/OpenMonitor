@@ -1,29 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { getMonitors, getChecks } from '../api/client.js';
-
-const styles = {
-  container: { maxWidth: 1000, margin: '0 auto', padding: '2rem 1.5rem' },
-  backBtn: {
-    background: 'transparent', border: '1px solid #334155', color: '#94a3b8',
-    borderRadius: 8, padding: '0.4rem 0.9rem', fontSize: '0.88rem', marginBottom: '1.5rem',
-  },
-  header: { marginBottom: '2rem' },
-  name: { fontSize: '1.75rem', fontWeight: 700, color: '#f1f5f9', marginBottom: '0.35rem' },
-  url: { fontSize: '0.9rem', color: '#94a3b8', wordBreak: 'break-all' },
-  badge: (color) => ({
-    display: 'inline-block', padding: '0.25rem 0.8rem', borderRadius: 20,
-    fontSize: '0.85rem', fontWeight: 700, background: color + '22', color, marginLeft: '1rem',
-  }),
-  section: { background: '#1e293b', borderRadius: 12, padding: '1.5rem', marginBottom: '1.5rem', border: '1px solid #334155' },
-  sectionTitle: { fontSize: '1rem', fontWeight: 600, color: '#94a3b8', marginBottom: '1rem' },
-  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' },
-  th: { textAlign: 'left', padding: '0.5rem 0.75rem', color: '#64748b', borderBottom: '1px solid #334155', fontWeight: 600 },
-  td: { padding: '0.5rem 0.75rem', borderBottom: '1px solid #1e293b', color: '#cbd5e1' },
-};
 
 function statusColor(is_up) {
   if (is_up === true) return '#22c55e';
@@ -34,6 +14,46 @@ function statusColor(is_up) {
 function formatTime(ts) {
   if (!ts) return '—';
   return new Date(ts).toLocaleString();
+}
+
+function formatUptime(seconds) {
+  if (seconds == null) return '—';
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function formatKbs(kbs) {
+  if (kbs == null) return '—';
+  if (kbs >= 1024 * 1024) return `${(kbs / 1024 / 1024).toFixed(1)} GB/s`;
+  if (kbs >= 1024) return `${(kbs / 1024).toFixed(1)} MB/s`;
+  return `${kbs} KB/s`;
+}
+
+function metricColor(pct) {
+  if (pct == null) return '#3b82f6';
+  if (pct >= 90) return '#ef4444';
+  if (pct >= 70) return '#f59e0b';
+  return '#22c55e';
+}
+
+function MetricBar({ label, value, unit = '%', fillPctOverride, color: colorProp, rightSlot }) {
+  const displayPct = fillPctOverride != null ? fillPctOverride : (unit === '%' ? value : 0);
+  const color = colorProp || metricColor(unit === '%' ? value : displayPct);
+  return (
+    <div className="metric-bar-row">
+      <span className="metric-bar-label">{label}</span>
+      <div className="metric-bar-track">
+        <div className="metric-bar-fill" style={{ width: `${Math.min(displayPct ?? 0, 100)}%`, background: color }} />
+      </div>
+      <span className="metric-bar-value" style={{ color }}>
+        {rightSlot || (value != null ? `${value}${unit}` : '—')}
+      </span>
+    </div>
+  );
 }
 
 export default function MonitorDetail() {
@@ -59,70 +79,382 @@ export default function MonitorDetail() {
     return () => clearInterval(interval);
   }, [load]);
 
-  if (!monitor) return <div style={{ padding: '2rem', color: '#94a3b8' }}>Loading…</div>;
+  if (!monitor) return <div className="loading-text">Loading…</div>;
 
+  const isServer = monitor.type === 'server';
   const color = statusColor(monitor.is_up);
-  const chartData = [...checks].reverse().map((c) => ({
+
+  const uptimePct = monitor.uptime_pct != null
+    ? monitor.uptime_pct
+    : checks.length > 0
+      ? ((checks.filter(c => c.is_up).length / checks.length) * 100).toFixed(2)
+      : null;
+
+  const uptimeColor = uptimePct == null ? '#f1f5f9'
+    : Number(uptimePct) >= 99 ? '#22c55e'
+      : Number(uptimePct) >= 90 ? '#f59e0b'
+        : '#ef4444';
+
+  const latestMeta = checks[0]?.metadata || null;
+
+  const webChartData = isServer ? [] : [...checks].reverse().map((c) => ({
     time: new Date(c.checked_at).toLocaleTimeString(),
     ms: c.response_time_ms,
   }));
 
-  return (
-    <div style={styles.container}>
-      <button style={styles.backBtn} onClick={() => navigate('/')}>← Back</button>
+  const reversed = isServer ? [...checks].reverse() : [];
 
-      <div style={styles.header}>
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <h1 style={styles.name}>{monitor.name}</h1>
-          <span style={styles.badge(color)}>
+  const serverCpuMemData = reversed.map((c) => ({
+    time: new Date(c.checked_at).toLocaleTimeString(),
+    cpu: c.metadata?.cpu_pct ?? null,
+    mem: c.metadata?.mem_pct ?? null,
+  }));
+
+  const serverDiskIoData = reversed.map((c) => ({
+    time: new Date(c.checked_at).toLocaleTimeString(),
+    read: c.metadata?.disk_read_kbs ?? null,
+    write: c.metadata?.disk_write_kbs ?? null,
+  }));
+
+  const serverNetData = reversed.map((c) => ({
+    time: new Date(c.checked_at).toLocaleTimeString(),
+    in: c.metadata?.net_in_kbs ?? null,
+    out: c.metadata?.net_out_kbs ?? null,
+  }));
+
+  const upChecks = checks.filter(c => c.response_time_ms != null);
+  const avgMs = monitor.avg_response_time_ms;
+  const minMs = upChecks.length > 0 ? Math.min(...upChecks.map(c => c.response_time_ms)) : null;
+  const maxMs = upChecks.length > 0 ? Math.max(...upChecks.map(c => c.response_time_ms)) : null;
+
+  const diskUsedGb = latestMeta?.disk_used_gb;
+  const diskTotalGb = latestMeta?.disk_total_gb;
+  const diskPct = latestMeta?.disk_pct;
+  const memUsedGb = latestMeta?.mem_used_mb != null ? (latestMeta.mem_used_mb / 1024).toFixed(1) : null;
+  const memTotalGb = latestMeta?.mem_total_mb != null ? (latestMeta.mem_total_mb / 1024).toFixed(1) : null;
+
+  return (
+    <div className="page-container page-container--narrow">
+      <button className="btn btn-ghost" style={{ marginBottom: '1.5rem' }} onClick={() => navigate('/')}>← Back</button>
+
+      <div style={{ marginBottom: '2rem' }}>
+        <div className="detail-title-row">
+          <h1 className="detail-name">{monitor.name}</h1>
+          <span className="badge badge--lg" style={{ background: color + '22', color }}>
             {monitor.is_up === true ? 'UP' : monitor.is_up === false ? 'DOWN' : 'UNKNOWN'}
           </span>
+          {monitor.type && <span className="tag tag--lg">{monitor.type}</span>}
+          {monitor.is_active === false && (
+            <span className="tag tag--lg tag-paused">paused</span>
+          )}
         </div>
-        <div style={styles.url}>{monitor.url}</div>
+        <div className="detail-url">{monitor.url}</div>
       </div>
 
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>Response Time (last 100 checks)</div>
-        {chartData.length === 0 ? (
-          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>No data yet.</p>
+      {/* Stats row */}
+      <div className="stats-row">
+        {uptimePct != null && (
+          <div className="stat-box">
+            <div className="stat-value" style={{ color: uptimeColor }}>{uptimePct}%</div>
+            <div className="stat-label">Uptime (24 h)</div>
+          </div>
+        )}
+        {isServer ? (
+          <>
+            {latestMeta?.cpu_pct != null && (
+              <div className="stat-box">
+                <div className="stat-value" style={{ color: metricColor(latestMeta.cpu_pct) }}>{latestMeta.cpu_pct}%</div>
+                <div className="stat-label">CPU</div>
+              </div>
+            )}
+            {latestMeta?.mem_pct != null && (
+              <div className="stat-box">
+                <div className="stat-value" style={{ color: metricColor(latestMeta.mem_pct) }}>{latestMeta.mem_pct}%</div>
+                <div className="stat-label">Memory</div>
+              </div>
+            )}
+            {latestMeta?.disk_pct != null && (
+              <div className="stat-box">
+                <div className="stat-value" style={{ color: metricColor(latestMeta.disk_pct) }}>{latestMeta.disk_pct}%</div>
+                <div className="stat-label">Disk</div>
+              </div>
+            )}
+            {latestMeta?.uptime_seconds != null && (
+              <div className="stat-box">
+                <div className="stat-value">{formatUptime(latestMeta.uptime_seconds)}</div>
+                <div className="stat-label">OS Uptime</div>
+              </div>
+            )}
+          </>
         ) : (
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 11 }} interval="preserveStartEnd" />
-              <YAxis tick={{ fill: '#64748b', fontSize: 11 }} unit=" ms" />
-              <Tooltip
-                contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8 }}
-                labelStyle={{ color: '#94a3b8' }}
-                itemStyle={{ color: '#3b82f6' }}
-              />
-              <Line type="monotone" dataKey="ms" stroke="#3b82f6" dot={false} strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
+          <>
+            {avgMs != null && (
+              <div className="stat-box">
+                <div className="stat-value">{avgMs} ms</div>
+                <div className="stat-label">Avg response (24 h)</div>
+              </div>
+            )}
+            {minMs != null && (
+              <div className="stat-box">
+                <div className="stat-value">{minMs} ms</div>
+                <div className="stat-label">Min response</div>
+              </div>
+            )}
+            {maxMs != null && (
+              <div className="stat-box">
+                <div className="stat-value">{maxMs} ms</div>
+                <div className="stat-label">Max response</div>
+              </div>
+            )}
+          </>
+        )}
+        <div className="stat-box">
+          <div className="stat-value">{monitor.interval_seconds ?? 60}s</div>
+          <div className="stat-label">Check interval</div>
+        </div>
+      </div>
+
+      {/* Server: system info header */}
+      {isServer && latestMeta && (
+        <div className="server-info-header">
+          {latestMeta.hostname && (
+            <div className="server-info-item">
+              <span className="server-info-icon">🖥</span>
+              <span className="server-info-label">Hostname</span>
+              <span className="server-info-value">{latestMeta.hostname}</span>
+            </div>
+          )}
+          <div className="server-info-item">
+            <span className="server-info-icon">⏱</span>
+            <span className="server-info-label">OS Uptime</span>
+            <span className="server-info-value">{formatUptime(latestMeta.uptime_seconds)}</span>
+          </div>
+          <div className="server-info-item">
+            <span className="server-info-icon">📊</span>
+            <span className="server-info-label">Load avg</span>
+            <span className="server-info-value">{latestMeta.load_1 ?? '—'}</span>
+          </div>
+          <div className="server-info-item">
+            <span className="server-info-icon">🕐</span>
+            <span className="server-info-label">Last heartbeat</span>
+            <span className="server-info-value">{formatTime(checks[0]?.checked_at)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Server: live resource gauges */}
+      {isServer && latestMeta && (
+        <div className="section">
+          <div className="section-title">Current Resource Usage</div>
+          <div className="metric-bars">
+            <MetricBar
+              label="CPU"
+              value={latestMeta.cpu_pct}
+              rightSlot={
+                <span>{latestMeta.cpu_pct != null ? `${latestMeta.cpu_pct}%` : '—'}</span>
+              }
+            />
+            <MetricBar
+              label="Memory"
+              value={latestMeta.mem_pct}
+              rightSlot={
+                <span>
+                  <span style={{ color: metricColor(latestMeta.mem_pct) }}>{latestMeta.mem_pct != null ? `${latestMeta.mem_pct}%` : '—'}</span>
+                  {memUsedGb && memTotalGb && (
+                    <span className="metric-bar-detail">{memUsedGb} / {memTotalGb} GB</span>
+                  )}
+                </span>
+              }
+            />
+            <MetricBar
+              label="Disk"
+              fillPctOverride={diskPct}
+              color={metricColor(diskPct)}
+              rightSlot={
+                <span>
+                  <span style={{ color: metricColor(diskPct) }}>{diskPct != null ? `${diskPct}%` : '—'}</span>
+                  {diskUsedGb != null && diskTotalGb != null && (
+                    <span className="metric-bar-detail">{diskUsedGb} / {diskTotalGb} GB</span>
+                  )}
+                </span>
+              }
+            />
+          </div>
+          {/* Disk capacity breakdown */}
+          {diskUsedGb != null && diskTotalGb != null && (
+            <div className="disk-capacity">
+              <div className="disk-capacity-row">
+                <div className="disk-capacity-item">
+                  <div className="disk-capacity-label">Used disk space</div>
+                  <div className="disk-capacity-val" style={{ color: metricColor(diskPct) }}>{diskUsedGb} GB</div>
+                </div>
+                <div className="disk-capacity-item disk-capacity-item--free">
+                  <div className="disk-capacity-label">Free disk space</div>
+                  <div className="disk-capacity-val" style={{ color: '#22c55e' }}>{(diskTotalGb - diskUsedGb).toFixed(0)} GB</div>
+                </div>
+                <div className="disk-capacity-item">
+                  <div className="disk-capacity-label">Total disk space</div>
+                  <div className="disk-capacity-val">{diskTotalGb} GB</div>
+                </div>
+              </div>
+              <div className="disk-capacity-bar-track">
+                <div className="disk-capacity-bar-fill" style={{ width: `${diskPct ?? 0}%`, background: metricColor(diskPct) }} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Chart: CPU & Mem or Response Time */}
+      <div className="section">
+        <div className="section-title">
+          {isServer ? `CPU & Memory — last ${checks.length} heartbeats` : `Response Time — last ${checks.length} checks`}
+        </div>
+        {isServer ? (
+          serverCpuMemData.length === 0 ? <p className="no-data">No data yet.</p> : (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={serverCpuMemData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 11 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} unit="%" domain={[0, 100]} />
+                <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8 }} labelStyle={{ color: '#94a3b8' }} />
+                <Legend wrapperStyle={{ color: '#94a3b8', fontSize: 12 }} />
+                <Line type="monotone" dataKey="cpu" name="CPU %" stroke="#f59e0b" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="mem" name="Mem %" stroke="#3b82f6" dot={false} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          )
+        ) : (
+          webChartData.length === 0 ? <p className="no-data">No data yet.</p> : (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={webChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 11 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} unit=" ms" />
+                <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8 }} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#3b82f6' }} />
+                <Line type="monotone" dataKey="ms" stroke="#3b82f6" dot={false} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          )
         )}
       </div>
 
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>Recent Checks</div>
-        <table style={styles.table}>
+      {/* Chart: Disk I/O */}
+      {isServer && (
+        <div className="section">
+          <div className="section-title">Disk I/O — read / write</div>
+          {serverDiskIoData.every(d => d.read == null) ? <p className="no-data">No disk I/O data yet.</p> : (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={serverDiskIoData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 11 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={v => formatKbs(v)} width={70} />
+                <Tooltip
+                  contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8 }}
+                  labelStyle={{ color: '#94a3b8' }}
+                  formatter={(v) => [formatKbs(v)]}
+                />
+                <Legend wrapperStyle={{ color: '#94a3b8', fontSize: 12 }} />
+                <Line type="monotone" dataKey="read" name="Read" stroke="#22c55e" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="write" name="Write" stroke="#f97316" dot={false} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      )}
+
+      {/* Chart: Network bandwidth */}
+      {isServer && (
+        <div className="section">
+          <div className="section-title">Network bandwidth — in / out</div>
+          {serverNetData.every(d => d.in == null) ? <p className="no-data">No network data yet.</p> : (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={serverNetData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 11 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={v => formatKbs(v)} width={70} />
+                <Tooltip
+                  contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8 }}
+                  labelStyle={{ color: '#94a3b8' }}
+                  formatter={(v) => [formatKbs(v)]}
+                />
+                <Legend wrapperStyle={{ color: '#94a3b8', fontSize: 12 }} />
+                <Line type="monotone" dataKey="in" name="In" stroke="#a78bfa" dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="out" name="Out" stroke="#f43f5e" dot={false} strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      )}
+
+      {/* Checks / Heartbeats table */}
+      <div className="section">
+        <div className="section-title">Recent {isServer ? 'Heartbeats' : 'Checks'} ({checks.length})</div>
+        <table className="data-table">
           <thead>
             <tr>
-              <th style={styles.th}>Time</th>
-              <th style={styles.th}>Status Code</th>
-              <th style={styles.th}>Response Time</th>
-              <th style={styles.th}>Result</th>
+              <th>Time</th>
+              {isServer ? (
+                <>
+                  <th>CPU %</th>
+                  <th>Memory</th>
+                  <th>Disk</th>
+                  <th>Disk I/O</th>
+                  <th>Network</th>
+                  <th>Load</th>
+                  <th>OS Uptime</th>
+                </>
+              ) : (
+                <>
+                  <th>Status Code</th>
+                  <th>Response Time</th>
+                </>
+              )}
+              <th>Result</th>
             </tr>
           </thead>
           <tbody>
-            {checks.slice(0, 20).map((c) => (
+            {checks.map((c) => (
               <tr key={c.id}>
-                <td style={styles.td}>{formatTime(c.checked_at)}</td>
-                <td style={styles.td}>{c.status_code ?? '—'}</td>
-                <td style={styles.td}>{c.response_time_ms != null ? `${c.response_time_ms} ms` : '—'}</td>
-                <td style={styles.td}>
-                  <span style={{
-                    color: statusColor(c.is_up), fontWeight: 600, fontSize: '0.82rem',
-                  }}>
+                <td>{formatTime(c.checked_at)}</td>
+                {isServer ? (
+                  <>
+                    <td>{c.metadata?.cpu_pct != null ? `${c.metadata.cpu_pct}%` : '—'}</td>
+                    <td>
+                      {c.metadata?.mem_pct != null ? `${c.metadata.mem_pct}%` : '—'}
+                      {c.metadata?.mem_used_mb != null && c.metadata?.mem_total_mb != null && (
+                        <span style={{ color: '#64748b', fontSize: '0.75rem', marginLeft: '0.3rem' }}>
+                          ({(c.metadata.mem_used_mb / 1024).toFixed(1)}/{(c.metadata.mem_total_mb / 1024).toFixed(1)} GB)
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {c.metadata?.disk_pct != null ? `${c.metadata.disk_pct}%` : '—'}
+                      {c.metadata?.disk_used_gb != null && c.metadata?.disk_total_gb != null && (
+                        <span style={{ color: '#64748b', fontSize: '0.75rem', marginLeft: '0.3rem' }}>
+                          ({c.metadata.disk_used_gb}/{c.metadata.disk_total_gb} GB)
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ fontSize: '0.78rem' }}>
+                      {c.metadata?.disk_read_kbs != null ? `↑ ${formatKbs(c.metadata.disk_read_kbs)}` : '—'}
+                      {c.metadata?.disk_write_kbs != null && <span style={{ display: 'block', color: '#f97316' }}>↓ {formatKbs(c.metadata.disk_write_kbs)}</span>}
+                    </td>
+                    <td style={{ fontSize: '0.78rem' }}>
+                      {c.metadata?.net_in_kbs != null ? `↓ ${formatKbs(c.metadata.net_in_kbs)}` : '—'}
+                      {c.metadata?.net_out_kbs != null && <span style={{ display: 'block', color: '#f43f5e' }}>↑ {formatKbs(c.metadata.net_out_kbs)}</span>}
+                    </td>
+                    <td>{c.metadata?.load_1 ?? '—'}</td>
+                    <td>{formatUptime(c.metadata?.uptime_seconds)}</td>
+                  </>
+                ) : (
+                  <>
+                    <td>{c.status_code ?? '—'}</td>
+                    <td>{c.response_time_ms != null ? `${c.response_time_ms} ms` : '—'}</td>
+                  </>
+                )}
+                <td>
+                  <span style={{ color: statusColor(c.is_up), fontWeight: 600, fontSize: '0.82rem' }}>
                     {c.is_up ? 'UP' : 'DOWN'}
                   </span>
                   {c.error && <span style={{ color: '#94a3b8', fontSize: '0.78rem', marginLeft: '0.5rem' }}>{c.error}</span>}
@@ -131,7 +463,7 @@ export default function MonitorDetail() {
             ))}
           </tbody>
         </table>
-        {checks.length === 0 && <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '0.5rem' }}>No checks yet.</p>}
+        {checks.length === 0 && <p className="no-data">No checks yet.</p>}
       </div>
     </div>
   );

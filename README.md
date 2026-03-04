@@ -1,12 +1,15 @@
 # OpenMonitor
 
-A lightweight, self-hosted server and web monitoring application. Track uptime and response times for any HTTP/HTTPS endpoint.
+A lightweight, self-hosted monitoring application for web endpoints, APIs, and servers. Track uptime, response times, and system metrics from a single dark-themed dashboard.
 
 ## Features
 
-- **Monitor any URL** – HTTP/HTTPS endpoints checked every 30 seconds
-- **Dashboard** – Live overview of all monitors with UP/DOWN status and average response time
-- **Detail view** – Response time chart and check history per monitor
+- **Web monitoring** – HTTP/HTTPS endpoints checked at configurable intervals (30 s – 10 min)
+- **API monitoring** – Configurable method, custom headers, request body, expected status codes, and JSON response assertion (dot-notation path + value)
+- **Server monitoring** – Push-based heartbeat agent (Bash) reports CPU, memory, disk, I/O, and network metrics; no open ports required
+- **Dashboard** – Live overview with UP/DOWN status, uptime %, avg response time, and 24-hour sparkbar
+- **Detail view** – Response time chart, check history table; server type shows metric gauges, disk capacity, I/O and network charts
+- **Webhook notifications** – Per-monitor DOWN/UP alerts sent as HTTP POST; testable from the UI
 - **Dark UI** – Clean, modern dark theme
 - **Docker ready** – Full stack via Docker Compose
 
@@ -51,7 +54,6 @@ createdb openmonitor
 
 ```bash
 cd backend
-cp src/.env.example .env
 # Edit .env with your DATABASE_URL if needed
 npm install
 npm run migrate
@@ -91,24 +93,53 @@ The dev server runs on `http://localhost:5173` and proxies `/api` requests to th
 
 ## API Reference
 
-| Method | Path                          | Description                      |
-|--------|-------------------------------|----------------------------------|
-| GET    | `/api/monitors`               | List all monitors + latest status |
-| POST   | `/api/monitors`               | Create a monitor                 |
-| PATCH  | `/api/monitors/:id`           | Update a monitor                 |
-| DELETE | `/api/monitors/:id`           | Delete a monitor                 |
-| GET    | `/api/monitors/:id/checks`    | Last 100 checks for a monitor    |
-| GET    | `/api/health`                 | Health check                     |
+| Method | Path                                    | Description                             |
+|--------|-----------------------------------------|-----------------------------------------|
+| GET    | `/api/monitors`                         | List all monitors + latest status + 24h stats |
+| POST   | `/api/monitors`                         | Create a monitor                        |
+| PATCH  | `/api/monitors/:id`                     | Update a monitor                        |
+| DELETE | `/api/monitors/:id`                     | Delete a monitor                        |
+| GET    | `/api/monitors/:id/checks`              | Last 100 checks for a monitor           |
+| POST   | `/api/monitors/:id/regenerate-token`    | Regenerate server monitor secret token  |
+| POST   | `/api/webhooks/test`                    | Send a test webhook notification        |
+| POST   | `/api/heartbeat/:token`                 | Agent heartbeat endpoint                |
+| GET    | `/api/health`                           | Health check → `{ status: "ok" }`      |
 
-### Create monitor – request body
+### Create web/API monitor – request body
 
 ```json
 {
-  "name": "My Site",
-  "url": "https://example.com",
-  "interval_seconds": 60
+  "name": "My API",
+  "url": "https://api.example.com/status",
+  "type": "api",
+  "interval_seconds": 60,
+  "webhook_url": "https://hooks.example.com/notify",
+  "method": "POST",
+  "request_headers": { "Authorization": "Bearer token123" },
+  "request_body": "{\"ping\": true}",
+  "expected_status_codes": "200,201",
+  "assert_json_path": "data.status",
+  "assert_json_value": "ok"
 }
 ```
+
+Fields `method`, `request_headers`, `request_body`, `expected_status_codes`, `assert_json_path`, and `assert_json_value` are only used when `type` is `api`. For `type: "web"` a plain GET is performed with 2xx/3xx accepted as UP.
+
+### Server monitor
+
+Set `type: "server"` – no `url` needed. After creation you receive a `secret_token`. Install the agent on your server:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/your-org/OpenMonitor/main/agent/openmonitor-agent.sh \
+  -o openmonitor-agent.sh
+chmod +x openmonitor-agent.sh
+sudo ./openmonitor-agent.sh --install \
+  --url http://your-openmonitor-host:3001 \
+  --token <secret_token> \
+  --interval 60
+```
+
+The agent sends CPU, memory, disk, I/O, and network metrics. No inbound port needed.
 
 ---
 

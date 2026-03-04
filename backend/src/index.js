@@ -4,6 +4,8 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const monitorsRouter = require('./routes/monitors');
 const checksRouter = require('./routes/checks');
+const webhooksRouter = require('./routes/webhooks');
+const heartbeatRouter = require('./routes/heartbeat');
 const { startChecker } = require('./jobs/checker');
 
 const app = express();
@@ -22,12 +24,15 @@ app.use(express.json());
 app.use('/api', apiLimiter);
 app.use('/api/monitors', monitorsRouter);
 app.use('/api/monitors/:id/checks', checksRouter);
+app.use('/api/webhooks', webhooksRouter);
+// Heartbeat endpoint has its own generous rate limit (agents send frequently)
+app.use('/api/heartbeat', rateLimit({ windowMs: 60 * 1000, max: 600, standardHeaders: true, legacyHeaders: false }), heartbeatRouter);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 async function start() {
   try {
-    startChecker();
+    await startChecker();
     app.listen(PORT, () => {
       console.log(`OpenMonitor backend running on port ${PORT}`);
     });

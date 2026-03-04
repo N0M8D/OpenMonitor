@@ -1,0 +1,914 @@
+/* ─────────────────────────────────────────────────────────
+   OpenMonitor – global styles
+   Dynamic values (badge color, bar color, uptime colour)
+   that depend on runtime data remain as inline style props.
+───────────────────────────────────────────────────────── */
+
+/* ── Layout ──────────────────────────────────────────── */
+
+.page-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+}
+
+.page-container--narrow {
+    max-width: 1000px;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.page-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+/* ── Buttons ─────────────────────────────────────────── */
+
+.btn {
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0.5rem 1.1rem;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn-primary {
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #2563eb;
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-ghost {
+    background: transparent;
+    border: 1px solid #334155;
+    color: #94a3b8;
+}
+
+.btn-ghost:hover {
+    border-color: #64748b;
+    color: #e2e8f0;
+}
+
+/* small action buttons on cards */
+.btn-sm {
+    border-radius: 6px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    background: transparent;
+}
+
+.btn-sm-blue {
+    border: 1px solid #3b82f6;
+    color: #3b82f6;
+}
+
+.btn-sm-blue:hover {
+    background: #1e3a5f;
+}
+
+.btn-sm-red {
+    border: 1px solid #ef4444;
+    color: #ef4444;
+}
+
+.btn-sm-red:hover {
+    background: #2d1b1b;
+}
+
+/* test webhook button */
+.btn-test {
+    background: transparent;
+    border: 1px solid #3b82f6;
+    color: #3b82f6;
+    border-radius: 6px;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.btn-test:hover {
+    background: #1e3a5f;
+}
+
+/* ── Badges / Tags ───────────────────────────────────── */
+
+/* .badge color + background must be set via inline style (runtime value) */
+.badge {
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.badge--lg {
+    padding: 0.25rem 0.8rem;
+    font-size: 0.85rem;
+}
+
+.tag {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: #1e3a5f;
+    color: #60a5fa;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+
+.tag--lg {
+    padding: 0.15rem 0.5rem;
+    font-size: 0.75rem;
+    margin-left: 0.75rem;
+}
+
+.tag-paused {
+    background: #2d1b1b;
+    color: #f87171;
+}
+
+/* ── Monitor grid ────────────────────────────────────── */
+
+.monitor-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.25rem;
+}
+
+.monitor-card {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    border: 1px solid #334155;
+}
+
+.monitor-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.monitor-card--paused {
+    opacity: 0.55;
+}
+
+.card-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+    color: #f1f5f9;
+}
+
+.card-url {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-bottom: 1rem;
+    word-break: break-all;
+}
+
+.card-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.card-metrics {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.card-metric-uptime {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+.card-metric-ms {
+    font-size: 0.82rem;
+    color: #94a3b8;
+}
+
+.card-bars-section {
+    margin-top: 0.9rem;
+}
+
+.bars-label {
+    font-size: 0.7rem;
+    color: #475569;
+    margin-bottom: 0.3rem;
+    letter-spacing: 0.03em;
+}
+
+.card-meta {
+    font-size: 0.78rem;
+    color: #64748b;
+    margin-top: 0.75rem;
+}
+
+.card-btn-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+/* ── Empty / loading states ─────────────────────────── */
+
+.empty-state {
+    text-align: center;
+    color: #64748b;
+    margin-top: 4rem;
+    font-size: 1rem;
+}
+
+.loading-text {
+    padding: 2rem;
+    color: #94a3b8;
+}
+
+/* ── Stats row ───────────────────────────────────────── */
+
+.stats-row {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.stat-box {
+    background: #1e293b;
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    border: 1px solid #334155;
+    min-width: 120px;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 0.2rem;
+}
+
+/* ── Section / Panel ─────────────────────────────────── */
+
+.section {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #334155;
+}
+
+.section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 1rem;
+}
+
+/* ── Monitor detail header ───────────────────────────── */
+
+.detail-name {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin: 0;
+}
+
+.detail-url {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    word-break: break-all;
+}
+
+.detail-title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+/* ── Data table ──────────────────────────────────────── */
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.data-table th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    color: #64748b;
+    border-bottom: 1px solid #334155;
+    font-weight: 600;
+}
+
+.data-table td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #1e293b;
+    color: #cbd5e1;
+}
+
+.no-data {
+    color: #64748b;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+/* ── Modal ───────────────────────────────────────────── */
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: #1e293b;
+    border-radius: 14px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 440px;
+    border: 1px solid #334155;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    margin-top: 0;
+    color: #f1f5f9;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.85rem;
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.form-label-hint {
+    color: #475569;
+    font-weight: 400;
+}
+
+.form-input {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #e2e8f0;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+    box-sizing: border-box;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+.form-btn-row {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+
+.webhook-test-row {
+    margin-top: -0.5rem;
+    margin-bottom: 1rem;
+}
+
+/* webhook status text color applied via inline style (runtime) */
+.webhook-status {
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+}
+
+.error-msg {
+    color: #ef4444;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+}
+
+.status-toggle-row {
+    margin-bottom: 1rem;
+}
+
+/* toggleBtn colors depend on runtime isActive state → inline style */
+.toggle-btn {
+    border-radius: 6px;
+    padding: 0.3rem 0.9rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+/* ── UptimeBars ──────────────────────────────────────── */
+
+.uptime-bars {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 28px;
+    position: relative;
+}
+
+.uptime-bar {
+    flex: 1;
+    height: 100%;
+    border-radius: 3px;
+    cursor: default;
+    /* background set via inline style (runtime data) */
+}
+
+.uptime-tooltip {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    transform: translateX(-50%);
+    background: #0f172a;
+    color: #e2e8f0;
+    font-size: 0.72rem;
+    padding: 0.3rem 0.55rem;
+    border-radius: 5px;
+    border: 1px solid #334155;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 50;
+    /* left set via inline style (runtime index) */
+}
+
+.uptime-empty {
+    height: 28px;
+    font-size: 0.75rem;
+    color: #334155;
+    display: flex;
+    align-items: center;
+}
+
+/* ── Server monitor setup guide ──────────────────────── */
+
+.info-box {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-left: 3px solid #3b82f6;
+    border-radius: 6px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.83rem;
+    color: #94a3b8;
+    line-height: 1.55;
+}
+
+.info-box strong {
+    color: #e2e8f0;
+}
+
+.info-box--warn {
+    border-left-color: #f59e0b;
+}
+
+.code-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.code-box {
+    flex: 1;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.78rem;
+    font-family: 'Consolas', 'Fira Code', monospace;
+    color: #7dd3fc;
+    word-break: break-all;
+    white-space: pre-wrap;
+}
+
+.code-block {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    font-size: 0.76rem;
+    font-family: 'Consolas', 'Fira Code', monospace;
+    color: #7dd3fc;
+    white-space: pre;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+
+.btn-copy {
+    background: transparent;
+    border: 1px solid #334155;
+    color: #64748b;
+    border-radius: 6px;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.btn-copy:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+}
+
+.btn-copy--ok {
+    border-color: #22c55e;
+    color: #22c55e;
+}
+
+.setup-guide {
+    margin-top: 1rem;
+}
+
+.setup-guide-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.6rem;
+}
+
+.setup-step {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    margin-bottom: 0.3rem;
+}
+
+.setup-step strong {
+    color: #cbd5e1;
+}
+
+/* token danger zone */
+.danger-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    background: #1a0a0a;
+    border: 1px solid #7f1d1d;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+}
+
+.danger-row span {
+    font-size: 0.8rem;
+    color: #fca5a5;
+}
+
+.btn-danger {
+    background: transparent;
+    border: 1px solid #ef4444;
+    color: #ef4444;
+    border-radius: 6px;
+    padding: 0.25rem 0.65rem;
+    font-size: 0.78rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-danger:hover {
+    background: #2d1b1b;
+}
+
+/* ── Metric bars (server monitor detail) ─────────────────────── */
+.metric-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.25rem 0;
+}
+
+.metric-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.metric-bar-label {
+    width: 3.5rem;
+    font-size: 0.8rem;
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
+.metric-bar-track {
+    flex: 1;
+    height: 8px;
+    background: #1e293b;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.metric-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.metric-bar-value {
+    width: 9rem;
+    text-align: right;
+    font-size: 0.85rem;
+    font-weight: 600;
+    flex-shrink: 0;
+    line-height: 1.3;
+}
+
+.metric-bar-sub {
+    font-weight: 400;
+    font-size: 0.72rem;
+    color: #64748b;
+    margin-left: 0.2rem;
+}
+
+.metric-bar-detail {
+    display: block;
+    font-weight: 400;
+    font-size: 0.72rem;
+    color: #64748b;
+    margin-top: 0.1rem;
+}
+
+/* ── Server info header ─────────────────────────────────────────────────── */
+.server-info-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.server-info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 0.45rem 0.8rem;
+    flex: 1 1 160px;
+}
+
+.server-info-icon {
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.server-info-label {
+    font-size: 0.72rem;
+    color: #64748b;
+    flex-shrink: 0;
+}
+
+.server-info-value {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-left: auto;
+    text-align: right;
+    word-break: break-all;
+}
+
+/* ── Disk capacity breakdown ────────────────────────────────────────────── */
+.disk-capacity {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #1e293b;
+}
+
+.disk-capacity-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.6rem;
+}
+
+.disk-capacity-item {
+    flex: 1;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    text-align: center;
+}
+
+.disk-capacity-item--free {
+    border-color: #14532d;
+}
+
+.disk-capacity-label {
+    font-size: 0.7rem;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+.disk-capacity-val {
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.disk-capacity-bar-track {
+    height: 10px;
+    background: #1e293b;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.disk-capacity-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.4s ease;
+}
+
+/* ── API Config Form ─────────────────────────────────────────────────────── */
+.api-config {
+    margin-top: 1.25rem;
+    padding: 1rem 1.125rem;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.api-config-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.optional-label {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #475569;
+}
+
+/* Headers list */
+.api-headers {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.api-header-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.form-input--sm {
+    flex: 1;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.82rem;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #e2e8f0;
+    min-width: 0;
+}
+
+.form-input--sm:focus {
+    outline: none;
+    border-color: #6366f1;
+}
+
+.btn-remove-header {
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.4rem;
+    border-radius: 4px;
+    line-height: 1;
+    transition: color 0.15s, background 0.15s;
+}
+
+.btn-remove-header:hover {
+    color: #ef4444;
+    background: #ef444422;
+}
+
+.btn-add-header {
+    align-self: flex-start;
+    background: none;
+    border: 1px dashed #334155;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 0.78rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    transition: color 0.15s, border-color 0.15s;
+    margin-top: 0.2rem;
+}
+
+.btn-add-header:hover {
+    color: #94a3b8;
+    border-color: #475569;
+}
+
+/* Request body textarea */
+.form-textarea {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 0.82rem;
+    font-family: 'Fira Mono', 'Consolas', monospace;
+    resize: vertical;
+    box-sizing: border-box;
+    line-height: 1.5;
+}
+
+.form-textarea:focus {
+    outline: none;
+    border-color: #6366f1;
+}
+
+/* JSON assertion section */
+.api-assert-section {
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #1e293b;
+}
+
+.api-assert-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+}
+
+.api-assert-eq {
+    color: #64748b;
+    font-size: 1.1rem;
+    padding-bottom: 0.5rem;
+    flex-shrink: 0;
+}
+
+.api-assert-hint {
+    font-size: 0.73rem;
+    color: #475569;
+    margin-top: 0.4rem;
+    line-height: 1.5;
+}
+
+.api-assert-hint code {
+    background: #1e293b;
+    padding: 0.1em 0.4em;
+    border-radius: 4px;
+    color: #94a3b8;
+    font-size: 0.9em;
+}
