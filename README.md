@@ -145,5 +145,14 @@ The agent sends CPU, memory, disk, I/O, and network metrics. No inbound port nee
 
 ## License
 
-See [LICENSE](./LICENSE).
+OpenMonitor is released under the [PolyForm Noncommercial License 1.0.0](./LICENSE).
+
+**Free for:** personal, educational, non-profit, and home-lab use.
+
+**Commercial use** (paid hosting, SaaS, embedding in a commercial product, etc.) requires
+a separate commercial license. See [COMMERCIAL_LICENSE.md](./COMMERCIAL_LICENSE.md) or
+contact [info@josefbouse.cz](mailto:info@josefbouse.cz).
+
+---
+
 Open Source Web Application to monitor your HW, homeland, servers, webs, APIs and services.
