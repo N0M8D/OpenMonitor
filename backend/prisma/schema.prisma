@@ -11,23 +11,24 @@ generator client {
 }
 
 model Monitor {
-  id                  Int       @id @default(autoincrement())
-  name                String    @db.VarChar(255)
-  url                 String    @db.VarChar(2048)
-  type                String    @default("web") @db.VarChar(50)
-  intervalSeconds     Int       @default(60) @map("interval_seconds")
-  isActive            Boolean   @default(true) @map("is_active")
-  webhookUrl          String?   @map("webhook_url") @db.VarChar(2048)
-  secretToken         String?   @unique @map("secret_token") @db.VarChar(64)
-  lastHeartbeatAt     DateTime? @map("last_heartbeat_at") @db.Timestamptz()
-  method              String    @default("GET") @map("method") @db.VarChar(10)
-  requestHeaders      Json?     @map("request_headers")
-  requestBody         String?   @map("request_body")
-  expectedStatusCodes String?   @map("expected_status_codes") @db.VarChar(100)
-  assertJsonPath      String?   @map("assert_json_path") @db.VarChar(500)
-  assertJsonValue     String?   @map("assert_json_value") @db.VarChar(500)
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  id                  Int             @id @default(autoincrement())
+  name                String          @db.VarChar(255)
+  url                 String          @db.VarChar(2048)
+  type                String          @default("web") @db.VarChar(50)
+  intervalSeconds     Int             @default(60) @map("interval_seconds")
+  isActive            Boolean         @default(true) @map("is_active")
+  webhookUrl          String?         @map("webhook_url") @db.VarChar(2048)
+  secretToken         String?         @unique @map("secret_token") @db.VarChar(64)
+  lastHeartbeatAt     DateTime?       @map("last_heartbeat_at") @db.Timestamptz()
+  method              String          @default("GET") @map("method") @db.VarChar(10)
+  requestHeaders      Json?           @map("request_headers")
+  requestBody         String?         @map("request_body")
+  expectedStatusCodes String?         @map("expected_status_codes") @db.VarChar(100)
+  assertJsonPath      String?         @map("assert_json_path") @db.VarChar(500)
+  assertJsonValue     String?         @map("assert_json_value") @db.VarChar(500)
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz()
   checks              Check[]
+  accessEntries       MonitorAccess[]
 
   @@map("monitors")
 }
@@ -45,4 +46,34 @@ model Check {
   monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
 
   @@map("checks")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique @db.VarChar(100)
+  email        String?   @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  role         String    @default("user") @db.VarChar(20)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz()
+  createdById  Int?      @map("created_by_id")
+
+  createdBy     User?           @relation("CreatedBy", fields: [createdById], references: [id])
+  createdUsers  User[]          @relation("CreatedBy")
+  accessEntries MonitorAccess[]
+
+  @@map("users")
+}
+
+model MonitorAccess {
+  monitorId Int      @map("monitor_id")
+  userId    Int      @map("user_id")
+  grantedAt DateTime @default(now()) @map("granted_at") @db.Timestamptz()
+
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([monitorId, userId])
+  @@map("monitor_access")
 }

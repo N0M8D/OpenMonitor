@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const { callWebhook } = require('../jobs/checker');
 const prisma = require('../db');
+const { requireAuth } = require('../middleware/auth');
 
 /**
  * POST /api/webhooks/test
  * Body: { webhook_url: string } OR { monitor_id: number }
  * Sends a test payload to the given webhook URL.
  */
-router.post('/test', async (req, res) => {
+router.post('/test', requireAuth, async (req, res) => {
     let webhookUrl = req.body.webhook_url;
 
     // If monitor_id is supplied, look up the webhook URL from DB

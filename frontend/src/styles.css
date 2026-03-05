@@ -912,3 +912,213 @@
     color: #94a3b8;
     font-size: 0.9em;
 }
+
+/* ── Navbar ──────────────────────────────────────────────────────────────────── */
+.navbar {
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+    background: #0f172a;
+    border-bottom: 1px solid #1e293b;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    text-decoration: none;
+    letter-spacing: -0.01em;
+}
+
+.navbar-brand:hover {
+    color: #fff;
+}
+
+.navbar-brand-icon {
+    font-size: 1.3rem;
+    color: #6366f1;
+    line-height: 1;
+}
+
+.navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.navbar-link {
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: color 0.15s;
+}
+
+.navbar-link:hover {
+    color: #e2e8f0;
+}
+
+.navbar-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.navbar-username {
+    font-size: 0.875rem;
+    color: #cbd5e1;
+    font-weight: 500;
+}
+
+.navbar-role {
+    font-size: 0.7rem;
+    background: #6366f122;
+    color: #818cf8;
+    padding: 0.15em 0.55em;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.navbar-logout {
+    background: none;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.navbar-logout:hover {
+    color: #e2e8f0;
+    border-color: #475569;
+}
+
+/* ── Login page ──────────────────────────────────────────────────────────────── */
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at 50% 0%, #1e1b4b 0%, #020617 60%);
+}
+
+.login-card {
+    width: 100%;
+    max-width: 380px;
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    box-shadow: 0 25px 60px #0005;
+}
+
+.login-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 1.75rem;
+}
+
+.login-logo-icon {
+    font-size: 2rem;
+    color: #6366f1;
+    line-height: 1;
+}
+
+.login-logo-text {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    letter-spacing: -0.02em;
+}
+
+.login-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin-bottom: 1.25rem;
+    text-align: center;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.login-btn {
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.7rem;
+    font-size: 0.95rem;
+}
+
+/* ── Setup page ──────────────────────────────────────────────────────────────── */
+.setup-card {
+    max-width: 420px;
+}
+
+.setup-subtitle {
+    color: #94a3b8;
+    font-size: 0.9rem;
+    text-align: center;
+    margin: -0.25rem 0 1.25rem;
+    line-height: 1.5;
+}
+
+/* ── Users table (admin) ─────────────────────────────────────────────────────── */
+.users-table {
+    width: 100%;
+}
+
+.users-table-username {
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+.users-table-email {
+    color: #94a3b8;
+    font-size: 0.85rem;
+}
+
+.users-table-actions {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+
+/* ── Shared form-group spacing ───────────────────────────────────────────────── */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+
+/* ── form-select (matches form-input styling) ────────────────────────────────── */
+.form-select {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 0.9rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2rem;
+}

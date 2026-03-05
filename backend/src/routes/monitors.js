@@ -2,11 +2,31 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../db');
 const { randomUUID } = require('crypto');
+const { requireAuth, requireMaintainer } = require('../middleware/auth');
+
+// All monitor routes require a valid session
+router.use(requireAuth);
+
+/** Returns true if the user can see/access a given monitor. */
+async function canAccessMonitor(user, monitorId) {
+  if (user.role === 'admin' || user.role === 'maintainer') return true;
+  const entry = await prisma.monitorAccess.findUnique({
+    where: { monitorId_userId: { monitorId, userId: user.id } },
+  });
+  return entry !== null;
+}
 
 // GET /api/monitors - list all monitors with latest check status, 24h avg response time, uptime % and hourly bars
 router.get('/', async (req, res) => {
+  const { role, id: userId } = req.user;
+  // Build access filter clause
+  const accessClause =
+    role === 'admin' || role === 'maintainer'
+      ? '' // no filter – see everything
+      : `AND m.id IN (SELECT monitor_id FROM monitor_access WHERE user_id = ${userId})`;
+
   try {
-    const monitors = await prisma.$queryRaw`
+    const monitors = await prisma.$queryRawUnsafe(`
       SELECT
         m.*,
         c.status_code,
@@ -67,8 +87,9 @@ router.get('/', async (req, res) => {
           GROUP BY gs.h
         ) h
       ) bars ON true
+      WHERE 1=1 ${accessClause}
       ORDER BY m.created_at DESC
-    `;
+    `);
     res.json(monitors);
   } catch (err) {
     console.error(err);
@@ -77,7 +98,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/monitors - create a monitor
-router.post('/', async (req, res) => {
+router.post('/', requireMaintainer, async (req, res) => {
   const {
     name, url, type = 'web', interval_seconds = 60, webhook_url,
     method, request_headers, request_body, expected_status_codes,
@@ -110,7 +131,7 @@ router.post('/', async (req, res) => {
 });
 
 // DELETE /api/monitors/:id - delete a monitor
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireMaintainer, async (req, res) => {
   try {
     await prisma.monitor.delete({ where: { id: parseInt(req.params.id, 10) } });
     res.json({ message: 'Monitor deleted' });
@@ -124,7 +145,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // PATCH /api/monitors/:id - update a monitor
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireMaintainer, async (req, res) => {
   const {
     name, url, type, interval_seconds, is_active, webhook_url,
     method, request_headers, request_body, expected_status_codes,
@@ -164,7 +185,7 @@ router.patch('/:id', async (req, res) => {
 });
 
 // POST /api/monitors/:id/regenerate-token - regenerate secret token for a server monitor
-router.post('/:id/regenerate-token', async (req, res) => {
+router.post('/:id/regenerate-token', requireMaintainer, async (req, res) => {
   try {
     const monitor = await prisma.monitor.findUnique({ where: { id: parseInt(req.params.id, 10) } });
     if (!monitor) return res.status(404).json({ error: 'Monitor not found' });
