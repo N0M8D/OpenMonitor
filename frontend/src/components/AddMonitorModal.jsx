@@ -17,6 +17,7 @@ export default function AddMonitorModal({ onClose, onCreated }) {
   const [url, setUrl] = useState('');
   const [type, setType] = useState('web');
   const [interval, setInterval] = useState('60');
+  const [description, setDescription] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -46,6 +47,7 @@ export default function AddMonitorModal({ onClose, onCreated }) {
         type,
         interval_seconds: parseInt(interval, 10),
         webhook_url: webhookUrl || undefined,
+        description: description || undefined,
       };
       if (isApi) {
         payload.method = apiMethod;
@@ -174,6 +176,13 @@ export default function AddMonitorModal({ onClose, onCreated }) {
             <option value="300">Every 5 minutes</option>
             <option value="600">Every 10 minutes</option>
           </select>
+
+          <label className="form-label">Description <span className="form-label-hint">(optional)</span></label>
+          <textarea
+            className="form-input form-textarea" value={description} rows={2}
+            placeholder="Short description shown on the status page…"
+            onChange={(e) => setDescription(e.target.value)}
+          />
 
           <label className="form-label">Webhook URL <span className="form-label-hint">(optional)</span></label>
           <input

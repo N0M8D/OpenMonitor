@@ -11,26 +11,43 @@ generator client {
 }
 
 model Monitor {
-  id                  Int             @id @default(autoincrement())
-  name                String          @db.VarChar(255)
-  url                 String          @db.VarChar(2048)
-  type                String          @default("web") @db.VarChar(50)
-  intervalSeconds     Int             @default(60) @map("interval_seconds")
-  isActive            Boolean         @default(true) @map("is_active")
-  webhookUrl          String?         @map("webhook_url") @db.VarChar(2048)
-  secretToken         String?         @unique @map("secret_token") @db.VarChar(64)
-  lastHeartbeatAt     DateTime?       @map("last_heartbeat_at") @db.Timestamptz()
-  method              String          @default("GET") @map("method") @db.VarChar(10)
-  requestHeaders      Json?           @map("request_headers")
-  requestBody         String?         @map("request_body")
-  expectedStatusCodes String?         @map("expected_status_codes") @db.VarChar(100)
-  assertJsonPath      String?         @map("assert_json_path") @db.VarChar(500)
-  assertJsonValue     String?         @map("assert_json_value") @db.VarChar(500)
-  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+  id                  Int                 @id @default(autoincrement())
+  name                String              @db.VarChar(255)
+  url                 String              @db.VarChar(2048)
+  type                String              @default("web") @db.VarChar(50)
+  intervalSeconds     Int                 @default(60) @map("interval_seconds")
+  isActive            Boolean             @default(true) @map("is_active")
+  webhookUrl          String?             @map("webhook_url") @db.VarChar(2048)
+  secretToken         String?             @unique @map("secret_token") @db.VarChar(64)
+  lastHeartbeatAt     DateTime?           @map("last_heartbeat_at") @db.Timestamptz()
+  method              String              @default("GET") @map("method") @db.VarChar(10)
+  requestHeaders      Json?               @map("request_headers")
+  requestBody         String?             @map("request_body")
+  expectedStatusCodes String?             @map("expected_status_codes") @db.VarChar(100)
+  assertJsonPath      String?             @map("assert_json_path") @db.VarChar(500)
+  assertJsonValue     String?             @map("assert_json_value") @db.VarChar(500)
+  description         String?             @db.Text
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz()
   checks              Check[]
   accessEntries       MonitorAccess[]
+  maintenanceWindows  MaintenanceWindow[]
+  incidents           Incident[]
 
   @@map("monitors")
+}
+
+model MaintenanceWindow {
+  id          Int       @id @default(autoincrement())
+  monitorId   Int       @map("monitor_id")
+  description String?   @db.Text
+  startAt     DateTime  @map("start_at") @db.Timestamptz()
+  endAt       DateTime? @map("end_at") @db.Timestamptz()
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  createdById Int?      @map("created_by_id")
+
+  monitor Monitor @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@map("maintenance_windows")
 }
 
 model Check {
@@ -76,4 +93,32 @@ model MonitorAccess {
 
   @@id([monitorId, userId])
   @@map("monitor_access")
+}
+
+model Incident {
+  id         Int       @id @default(autoincrement())
+  monitorId  Int       @map("monitor_id")
+  startedAt  DateTime  @default(now()) @map("started_at") @db.Timestamptz()
+  resolvedAt DateTime? @map("resolved_at") @db.Timestamptz()
+  title      String?   @db.VarChar(255)
+  status     String    @default("open") @db.VarChar(32)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  monitor Monitor          @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  updates IncidentUpdate[]
+
+  @@map("incidents")
+}
+
+model IncidentUpdate {
+  id          Int      @id @default(autoincrement())
+  incidentId  Int      @map("incident_id")
+  message     String   @db.Text
+  status      String   @default("update") @db.VarChar(32)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  createdById Int?     @map("created_by_id")
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@map("incident_updates")
 }

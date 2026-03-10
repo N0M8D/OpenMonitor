@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const fetch = require('node-fetch');
+const tls = require('tls');
 const prisma = require('../db');
 
 // In-memory state per monitor
@@ -9,6 +10,38 @@ const prisma = require('../db');
 // Exported so that heartbeat.js can update them when a heartbeat arrives.
 const lastChecked = new Map();
 const lastStatus = new Map();
+
+/**
+ * Retrieve SSL certificate metadata for a given hostname/port.
+ * Returns { ssl_expires_at, ssl_days_remaining, ssl_issuer } or null on failure.
+ * Uses rejectUnauthorized: false so we still capture info for invalid/expired certs.
+ */
+function getSslInfo(hostname, port = 443) {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => { socket.destroy(); resolve(null); }, 5000);
+    const socket = tls.connect(
+      { host: hostname, port, servername: hostname, rejectUnauthorized: false },
+      () => {
+        clearTimeout(timeout);
+        try {
+          const cert = socket.getPeerCertificate();
+          socket.destroy();
+          if (!cert || !cert.valid_to) return resolve(null);
+          const expiresAt = new Date(cert.valid_to);
+          const daysRemaining = Math.floor((expiresAt.getTime() - Date.now()) / 86400000);
+          resolve({
+            ssl_expires_at: expiresAt.toISOString(),
+            ssl_days_remaining: daysRemaining,
+            ssl_issuer: cert.issuer?.O || null,
+          });
+        } catch {
+          resolve(null);
+        }
+      },
+    );
+    socket.on('error', () => { clearTimeout(timeout); resolve(null); });
+  });
+}
 
 /**
  * Call a monitor's webhook URL with the given payload.
@@ -50,6 +83,16 @@ async function checkServerMonitor(monitor) {
   const prevStatus = lastStatus.get(monitor.id);
 
   if (!isUp && prevStatus !== false) {
+    // Check if monitor is in active maintenance — if so, skip DOWN webhook
+    const activeMaint = await prisma.$queryRaw`
+      SELECT id FROM maintenance_windows
+      WHERE monitor_id = ${monitor.id}
+        AND start_at <= NOW()
+        AND (end_at IS NULL OR end_at > NOW())
+      LIMIT 1
+    `;
+    const inMaintenance = activeMaint.length > 0;
+
     // Transition: UP/unknown → DOWN
     const checkedAt = new Date();
     const secsSince = Math.round(msSinceHeartbeat / 1000);
@@ -64,7 +107,7 @@ async function checkServerMonitor(monitor) {
     lastStatus.set(monitor.id, false);
     lastChecked.set(monitor.id, checkedAt);
 
-    if (monitor.webhookUrl) {
+    if (monitor.webhookUrl && !inMaintenance) {
       await callWebhook(monitor.webhookUrl, {
         event: 'monitor.down',
         monitor: { id: monitor.id, name: monitor.name, url: monitor.url },
@@ -72,9 +115,19 @@ async function checkServerMonitor(monitor) {
         checkedAt: checkedAt.toISOString(),
       });
     }
+    // Auto-create stored incident (skip during maintenance)
+    if (!inMaintenance) {
+      const open = await prisma.incident.findFirst({ where: { monitorId: monitor.id, resolvedAt: null } });
+      if (!open) await prisma.incident.create({ data: { monitorId: monitor.id, startedAt: checkedAt, status: 'open' } });
+    }
   } else if (isUp && prevStatus === false) {
     // Recovery already handled by heartbeat.js; just sync in-memory state
     lastStatus.set(monitor.id, true);
+    // Close any open incidents on recovery
+    await prisma.incident.updateMany({
+      where: { monitorId: monitor.id, resolvedAt: null },
+      data: { resolvedAt: new Date(), status: 'resolved' },
+    });
   }
 }
 
@@ -188,6 +241,15 @@ async function checkMonitor(monitor) {
   let isUp = false;
   let error = null;
 
+  // Start SSL check in parallel for https:// monitors (non-blocking to main check)
+  let sslPromise = Promise.resolve(null);
+  if (monitor.url.startsWith('https://')) {
+    try {
+      const { hostname, port } = new URL(monitor.url);
+      sslPromise = getSslInfo(hostname, parseInt(port, 10) || 443);
+    } catch { /* ignore invalid URL */ }
+  }
+
   if (monitor.type === 'api') {
     ({ statusCode, responseTimeMs, isUp, error } = await checkApiMonitor(monitor, start));
   } else {
@@ -213,6 +275,10 @@ async function checkMonitor(monitor) {
 
   const checkedAt = new Date();
 
+  // Collect SSL info (usually already resolved since HTTP check ran concurrently)
+  const sslInfo = await sslPromise;
+  const metadata = sslInfo || null;
+
   await prisma.check.create({
     data: {
       monitorId: monitor.id,
@@ -220,6 +286,7 @@ async function checkMonitor(monitor) {
       responseTimeMs,
       isUp,
       error,
+      metadata,
     },
   });
 
@@ -233,14 +300,24 @@ async function checkMonitor(monitor) {
     // Only notify when transitioning to DOWN (or first check is DOWN)
     const justWentDown = prevStatus === true || prevStatus === undefined || prevStatus === null;
     if (justWentDown) {
-      await callWebhook(monitor.webhookUrl, {
-        event: 'monitor.down',
-        monitor: { id: monitor.id, name: monitor.name, url: monitor.url },
-        statusCode,
-        responseTimeMs,
-        error,
-        checkedAt: checkedAt.toISOString(),
-      });
+      // Skip webhook if monitor is in active maintenance
+      const activeMaint = await prisma.$queryRaw`
+        SELECT id FROM maintenance_windows
+        WHERE monitor_id = ${monitor.id}
+          AND start_at <= NOW()
+          AND (end_at IS NULL OR end_at > NOW())
+        LIMIT 1
+      `;
+      if (activeMaint.length === 0) {
+        await callWebhook(monitor.webhookUrl, {
+          event: 'monitor.down',
+          monitor: { id: monitor.id, name: monitor.name, url: monitor.url },
+          statusCode,
+          responseTimeMs,
+          error,
+          checkedAt: checkedAt.toISOString(),
+        });
+      }
     }
   }
 
@@ -252,6 +329,28 @@ async function checkMonitor(monitor) {
       statusCode,
       responseTimeMs,
       checkedAt: checkedAt.toISOString(),
+    });
+  }
+
+  // Auto-create/close stored incidents for HTTP/API monitors
+  const justWentDown = !isUp && (prevStatus === true || prevStatus === undefined || prevStatus === null);
+  if (justWentDown) {
+    const activeMaint = await prisma.$queryRaw`
+      SELECT id FROM maintenance_windows
+      WHERE monitor_id = ${monitor.id}
+        AND start_at <= NOW()
+        AND (end_at IS NULL OR end_at > NOW())
+      LIMIT 1
+    `;
+    if (activeMaint.length === 0) {
+      const open = await prisma.incident.findFirst({ where: { monitorId: monitor.id, resolvedAt: null } });
+      if (!open) await prisma.incident.create({ data: { monitorId: monitor.id, startedAt: checkedAt, status: 'open' } });
+    }
+  }
+  if (isUp && prevStatus === false) {
+    await prisma.incident.updateMany({
+      where: { monitorId: monitor.id, resolvedAt: null },
+      data: { resolvedAt: checkedAt, status: 'resolved' },
     });
   }
 }

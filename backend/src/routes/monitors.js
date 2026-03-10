@@ -29,6 +29,7 @@ router.get('/', async (req, res) => {
     const monitors = await prisma.$queryRawUnsafe(`
       SELECT
         m.*,
+        m.created_at AS monitor_created_at,
         c.status_code,
         c.response_time_ms,
         c.is_up,
@@ -36,7 +37,14 @@ router.get('/', async (req, res) => {
         c.error,
         avg_check.avg_response_time_ms,
         uptime.uptime_pct,
-        bars.hourly_bars
+        uptime_7d.uptime_7d_pct,
+        uptime_30d.uptime_30d_pct,
+        bars.daily_bars,
+        mw.maintenance_active,
+        mw.maintenance_description,
+        mw.maintenance_start_at,
+        mw.maintenance_end_at,
+        mw.maintenance_id
       FROM monitors m
       LEFT JOIN LATERAL (
         SELECT * FROM checks
@@ -61,32 +69,85 @@ router.get('/', async (req, res) => {
         WHERE monitor_id = m.id AND checked_at > NOW() - INTERVAL '24 hours'
       ) uptime ON true
       LEFT JOIN LATERAL (
+        SELECT
+          ROUND(
+            COUNT(CASE WHEN is_up THEN 1 END)::NUMERIC
+            / NULLIF(COUNT(*), 0) * 100,
+            2
+          ) AS uptime_7d_pct
+        FROM checks
+        WHERE monitor_id = m.id AND checked_at > NOW() - INTERVAL '7 days'
+      ) uptime_7d ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          ROUND(
+            COUNT(CASE WHEN is_up THEN 1 END)::NUMERIC
+            / NULLIF(COUNT(*), 0) * 100,
+            2
+          ) AS uptime_30d_pct
+        FROM checks
+        WHERE monitor_id = m.id AND checked_at > NOW() - INTERVAL '30 days'
+      ) uptime_30d ON true
+      LEFT JOIN LATERAL (
         SELECT json_agg(
           json_build_object(
-            'hour',  h.hour_str,
-            'up',    h.up_count,
-            'down',  h.down_count,
-            'total', h.total_count
-          ) ORDER BY h.h
-        ) AS hourly_bars
+            'day',               d.day_str,
+            'up',                d.up_count,
+            'down',              d.down_count,
+            'total',             d.total_count,
+            'incident',          d.had_incident,
+            'maintenance',       d.had_maintenance,
+            'max_incident_secs', d.max_incident_secs
+          ) ORDER BY d.d
+        ) AS daily_bars
         FROM (
           SELECT
-            gs.h,
-            to_char(gs.h AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:00:00"Z"') AS hour_str,
+            gs.d,
+            to_char(gs.d AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day_str,
             COUNT(CASE WHEN ch.is_up = true  THEN 1 END)::INTEGER AS up_count,
             COUNT(CASE WHEN ch.is_up = false THEN 1 END)::INTEGER AS down_count,
-            COUNT(ch.id)::INTEGER AS total_count
+            COUNT(ch.id)::INTEGER                                  AS total_count,
+            EXISTS(
+              SELECT 1 FROM incidents inc
+              WHERE inc.monitor_id = m.id
+                AND date_trunc('day', inc.started_at AT TIME ZONE 'UTC') = gs.d
+            ) AS had_incident,
+            EXISTS(
+              SELECT 1 FROM maintenance_windows mw2
+              WHERE mw2.monitor_id = m.id
+                AND date_trunc('day', mw2.start_at AT TIME ZONE 'UTC') = gs.d
+            ) AS had_maintenance,
+            COALESCE((
+              SELECT MAX(EXTRACT(EPOCH FROM (COALESCE(inc.resolved_at, NOW()) - inc.started_at))::INTEGER)
+              FROM incidents inc
+              WHERE inc.monitor_id = m.id
+                AND date_trunc('day', inc.started_at AT TIME ZONE 'UTC') = gs.d
+            ), 0) AS max_incident_secs
           FROM generate_series(
-            date_trunc('hour', NOW() - INTERVAL '23 hours'),
-            date_trunc('hour', NOW()),
-            INTERVAL '1 hour'
-          ) gs(h)
+            date_trunc('day', NOW() AT TIME ZONE 'UTC') - INTERVAL '59 days',
+            date_trunc('day', NOW() AT TIME ZONE 'UTC'),
+            INTERVAL '1 day'
+          ) gs(d)
           LEFT JOIN checks ch
             ON ch.monitor_id = m.id
-           AND date_trunc('hour', ch.checked_at) = gs.h
-          GROUP BY gs.h
-        ) h
+           AND date_trunc('day', ch.checked_at AT TIME ZONE 'UTC') = gs.d
+          GROUP BY gs.d
+        ) d
       ) bars ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          id                                                        AS maintenance_id,
+          description                                               AS maintenance_description,
+          start_at                                                  AS maintenance_start_at,
+          end_at                                                    AS maintenance_end_at,
+          (start_at <= NOW() AND (end_at IS NULL OR end_at > NOW())) AS maintenance_active
+        FROM maintenance_windows
+        WHERE monitor_id = m.id
+          AND (end_at IS NULL OR end_at > NOW())
+          AND start_at <= NOW() + INTERVAL '1 year'
+        ORDER BY start_at ASC
+        LIMIT 1
+      ) mw ON true
       WHERE 1=1 ${accessClause}
       ORDER BY m.created_at DESC
     `);
@@ -100,7 +161,7 @@ router.get('/', async (req, res) => {
 // POST /api/monitors - create a monitor
 router.post('/', requireMaintainer, async (req, res) => {
   const {
-    name, url, type = 'web', interval_seconds = 60, webhook_url,
+    name, url, type = 'web', interval_seconds = 60, webhook_url, description,
     method, request_headers, request_body, expected_status_codes,
     assert_json_path, assert_json_value,
   } = req.body;
@@ -114,6 +175,7 @@ router.post('/', requireMaintainer, async (req, res) => {
         name, url, type,
         intervalSeconds: interval_seconds,
         webhookUrl: webhook_url || null,
+        description: description || null,
         secretToken,
         method: method || 'GET',
         requestHeaders: request_headers || null,
@@ -147,7 +209,7 @@ router.delete('/:id', requireMaintainer, async (req, res) => {
 // PATCH /api/monitors/:id - update a monitor
 router.patch('/:id', requireMaintainer, async (req, res) => {
   const {
-    name, url, type, interval_seconds, is_active, webhook_url,
+    name, url, type, interval_seconds, is_active, webhook_url, description,
     method, request_headers, request_body, expected_status_codes,
     assert_json_path, assert_json_value,
   } = req.body;
@@ -158,6 +220,7 @@ router.patch('/:id', requireMaintainer, async (req, res) => {
   if (interval_seconds !== undefined) data.intervalSeconds = interval_seconds;
   if (is_active !== undefined) data.isActive = is_active;
   if (webhook_url !== undefined) data.webhookUrl = webhook_url || null;
+  if (description !== undefined) data.description = description || null;
   if (method !== undefined) data.method = method || 'GET';
   if (request_headers !== undefined) data.requestHeaders = request_headers || null;
   if (request_body !== undefined) data.requestBody = request_body || null;

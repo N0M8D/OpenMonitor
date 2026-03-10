@@ -12,6 +12,11 @@ const heartbeatRouter = require('./routes/heartbeat');
 const { router: authRouter } = require('./routes/auth');
 const usersRouter = require('./routes/users');
 const accessRouter = require('./routes/access');
+const incidentsRouter = require('./routes/incidents');
+const statusRouter = require('./routes/status');
+const maintenanceRouter = require('./routes/maintenance');
+const activityRouter = require('./routes/activity');
+const publicIncidentsRouter = require('./routes/public-incidents');
 const { startChecker } = require('./jobs/checker');
 
 const app = express();
@@ -57,10 +62,15 @@ app.use('/api', apiLimiter);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRouter);
+app.use('/api/status', statusRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/monitors', monitorsRouter);
 app.use('/api/monitors/:id/checks', checksRouter);
+app.use('/api/monitors/:id/incidents', incidentsRouter);
+app.use('/api/monitors/:id/maintenance', maintenanceRouter);
 app.use('/api/monitors/:id/access', accessRouter);
+app.use('/api/activity', activityRouter);
+app.use('/api/public-incidents', publicIncidentsRouter);
 app.use('/api/webhooks', webhooksRouter);
 app.use(
   '/api/heartbeat',

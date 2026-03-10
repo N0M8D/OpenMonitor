@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { getMonitors, getChecks } from '../api/client.js';
+import { getMonitors, getChecks, getIncidents, getMaintenance } from '../api/client.js';
+import MaintenanceModal from '../components/MaintenanceModal.jsx';
+import IncidentCard from '../components/IncidentCard.jsx';
 
 function statusColor(is_up) {
   if (is_up === true) return '#22c55e';
@@ -14,6 +16,17 @@ function statusColor(is_up) {
 function formatTime(ts) {
   if (!ts) return '—';
   return new Date(ts).toLocaleString();
+}
+
+function formatDuration(seconds) {
+  if (seconds == null) return '—';
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m < 60) return `${m}m ${s}s`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return `${h}h ${rm}m`;
 }
 
 function formatUptime(seconds) {
@@ -61,17 +74,28 @@ export default function MonitorDetail() {
   const navigate = useNavigate();
   const [monitor, setMonitor] = useState(null);
   const [checks, setChecks] = useState([]);
+  const [incidents, setIncidents] = useState([]);
+  const [maintenanceWindows, setMaintenanceWindows] = useState([]);
+  const [showMaintModal, setShowMaintModal] = useState(false);
+  const [range, setRange] = useState('24h');
 
   const load = useCallback(async () => {
     try {
-      const [monitors, checksData] = await Promise.all([getMonitors(), getChecks(id)]);
+      const [monitors, checksData, incidentsData, maintData] = await Promise.all([
+        getMonitors(),
+        getChecks(id, range),
+        getIncidents(id),
+        getMaintenance(id).catch(() => []),
+      ]);
       const m = monitors.find((x) => String(x.id) === String(id));
       setMonitor(m || null);
       setChecks(checksData);
+      setIncidents(incidentsData);
+      setMaintenanceWindows(maintData);
     } catch (e) {
       console.error(e);
     }
-  }, [id]);
+  }, [id, range]);
 
   useEffect(() => {
     load();
@@ -143,12 +167,35 @@ export default function MonitorDetail() {
           <span className="badge badge--lg" style={{ background: color + '22', color }}>
             {monitor.is_up === true ? 'UP' : monitor.is_up === false ? 'DOWN' : 'UNKNOWN'}
           </span>
+          {monitor.maintenance_active && (
+            <span className="maint-badge maint-badge--active">🔧 Maintenance</span>
+          )}
+          {!monitor.maintenance_active && monitor.maintenance_id && (
+            <span className="maint-badge maint-badge--scheduled">scheduled</span>
+          )}
           {monitor.type && <span className="tag tag--lg">{monitor.type}</span>}
           {monitor.is_active === false && (
             <span className="tag tag--lg tag-paused">paused</span>
           )}
+          <button className="btn btn-ghost" style={{ marginLeft: 'auto', fontSize: '0.85rem' }} onClick={() => setShowMaintModal(true)}>
+            🔧 Maintenance
+          </button>
         </div>
         <div className="detail-url">{monitor.url}</div>
+        {monitor.description && (
+          <p className="detail-description">{monitor.description}</p>
+        )}
+        {monitor.maintenance_active && (
+          <div className="maint-active-banner">
+            <strong>🔧 Under maintenance</strong>
+            {monitor.maintenance_description && <span> — {monitor.maintenance_description}</span>}
+            {monitor.maintenance_end_at && (
+              <span style={{ fontSize: '0.82rem', color: '#94a3b8', marginLeft: '0.5rem' }}>
+                until {new Date(monitor.maintenance_end_at).toLocaleString()}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Stats row */}
@@ -157,6 +204,22 @@ export default function MonitorDetail() {
           <div className="stat-box">
             <div className="stat-value" style={{ color: uptimeColor }}>{uptimePct}%</div>
             <div className="stat-label">Uptime (24 h)</div>
+          </div>
+        )}
+        {monitor.uptime_7d_pct != null && (
+          <div className="stat-box">
+            <div className="stat-value" style={{ color: Number(monitor.uptime_7d_pct) >= 99 ? '#22c55e' : Number(monitor.uptime_7d_pct) >= 90 ? '#f59e0b' : '#ef4444' }}>
+              {monitor.uptime_7d_pct}%
+            </div>
+            <div className="stat-label">Uptime (7 d)</div>
+          </div>
+        )}
+        {monitor.uptime_30d_pct != null && (
+          <div className="stat-box">
+            <div className="stat-value" style={{ color: Number(monitor.uptime_30d_pct) >= 99 ? '#22c55e' : Number(monitor.uptime_30d_pct) >= 90 ? '#f59e0b' : '#ef4444' }}>
+              {monitor.uptime_30d_pct}%
+            </div>
+            <div className="stat-label">Uptime (30 d)</div>
           </div>
         )}
         {isServer ? (
@@ -206,12 +269,38 @@ export default function MonitorDetail() {
                 <div className="stat-label">Max response</div>
               </div>
             )}
+            {latestMeta?.ssl_days_remaining != null && (() => {
+              const d = latestMeta.ssl_days_remaining;
+              const sslColor = d <= 7 ? '#ef4444' : d <= 30 ? '#f59e0b' : '#22c55e';
+              return (
+                <div className="stat-box">
+                  <div className="stat-value" style={{ color: sslColor }}>
+                    {d < 0 ? 'Expired' : `${d}d`}
+                  </div>
+                  <div className="stat-label">SSL expires</div>
+                </div>
+              );
+            })()}
           </>
         )}
         <div className="stat-box">
           <div className="stat-value">{monitor.interval_seconds ?? 60}s</div>
           <div className="stat-label">Check interval</div>
         </div>
+      </div>
+
+      {/* Time range selector */}
+      <div className="range-selector">
+        {['6h', '24h', '7d'].map((r) => (
+          <button
+            key={r}
+            className={`range-btn${range === r ? ' range-btn--active' : ''}`}
+            onClick={() => setRange(r)}
+          >
+            {r}
+          </button>
+        ))}
+        <span className="range-label">{checks.length} data points</span>
       </div>
 
       {/* Server: system info header */}
@@ -387,6 +476,26 @@ export default function MonitorDetail() {
         </div>
       )}
 
+      {/* Incident log */}
+      <div className="section">
+        <div className="section-title">Incident Log ({incidents.length})</div>
+        {incidents.length === 0 ? (
+          <p className="no-data">No incidents recorded — monitor has been up the entire time.</p>
+        ) : (
+          <div className="incident-list">
+            {incidents.map((inc) => (
+              <IncidentCard
+                key={inc.id}
+                incident={inc}
+                monitorId={id}
+                onUpdated={load}
+                canWrite={true}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Checks / Heartbeats table */}
       <div className="section">
         <div className="section-title">Recent {isServer ? 'Heartbeats' : 'Checks'} ({checks.length})</div>
@@ -465,6 +574,15 @@ export default function MonitorDetail() {
         </table>
         {checks.length === 0 && <p className="no-data">No checks yet.</p>}
       </div>
+
+      {showMaintModal && (
+        <MaintenanceModal
+          monitorId={monitor.id}
+          windows={maintenanceWindows}
+          onClose={() => setShowMaintModal(false)}
+          onChanged={() => { load(); }}
+        />
+      )}
     </div>
   );
 }

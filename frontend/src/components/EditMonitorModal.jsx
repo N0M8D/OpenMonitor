@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { updateMonitor, testWebhook } from '../api/client.js';
+import { useState, useEffect } from 'react';
+import { updateMonitor, testWebhook, getUsers, getMonitorAccess, setMonitorAccess } from '../api/client.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import ServerSetupGuide from './ServerSetupGuide.jsx';
 import ApiConfigForm from './ApiConfigForm.jsx';
 
@@ -31,6 +32,7 @@ export default function EditMonitorModal({ monitor, onClose, onSaved }) {
     const [type, setType] = useState(monitor.type || 'web');
     const [interval, setInterval] = useState(String(monitor.interval_seconds || 60));
     const [isActive, setIsActive] = useState(monitor.is_active !== false);
+    const [description, setDescription] = useState(monitor.description || '');
     const [webhookUrl, setWebhookUrl] = useState(monitor.webhook_url || '');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -49,6 +51,53 @@ export default function EditMonitorModal({ monitor, onClose, onSaved }) {
     const isServer = type === 'server';
     const isApi = type === 'api';
 
+    const { user: currentUser } = useAuth();
+    const isAdmin = currentUser?.role === 'admin';
+
+    // Access management (admin only)
+    const [userList, setUserList] = useState([]);       // users with role='user'
+    const [accessIds, setAccessIds] = useState(new Set());
+    const [accessLoading, setAccessLoading] = useState(false);
+    const [accessSaving, setAccessSaving] = useState(false);
+    const [accessError, setAccessError] = useState('');
+    const [accessSaved, setAccessSaved] = useState(false);
+
+    useEffect(() => {
+        if (!isAdmin) return;
+        setAccessLoading(true);
+        Promise.all([getUsers(), getMonitorAccess(monitor.id)])
+            .then(([users, accessUsers]) => {
+                setUserList(users.filter((u) => u.role === 'user' && u.isActive));
+                setAccessIds(new Set(accessUsers.map((u) => u.id)));
+            })
+            .catch((err) => setAccessError(err.message))
+            .finally(() => setAccessLoading(false));
+    }, [monitor.id, isAdmin]);
+
+    const toggleAccess = (userId) => {
+        setAccessIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(userId)) next.delete(userId);
+            else next.add(userId);
+            return next;
+        });
+        setAccessSaved(false);
+    };
+
+    const handleSaveAccess = async () => {
+        setAccessSaving(true);
+        setAccessError('');
+        setAccessSaved(false);
+        try {
+            await setMonitorAccess(monitor.id, [...accessIds]);
+            setAccessSaved(true);
+        } catch (err) {
+            setAccessError(err.message);
+        } finally {
+            setAccessSaving(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -61,6 +110,7 @@ export default function EditMonitorModal({ monitor, onClose, onSaved }) {
                 interval_seconds: parseInt(interval, 10),
                 is_active: isActive,
                 webhook_url: webhookUrl || null,
+                description: description || null,
             };
             if (isApi) {
                 payload.method = apiMethod;
@@ -159,6 +209,13 @@ export default function EditMonitorModal({ monitor, onClose, onSaved }) {
                         />
                     )}
 
+                    <label className="form-label">Description <span className="form-label-hint">(optional)</span></label>
+                    <textarea
+                        className="form-input form-textarea" value={description} rows={2}
+                        placeholder="Short description shown on the status page…"
+                        onChange={(e) => setDescription(e.target.value)}
+                    />
+
                     <label className="form-label">Webhook URL <span className="form-label-hint">(optional)</span></label>
                     <input
                         className="form-input" type="url" value={webhookUrl}
@@ -194,6 +251,47 @@ export default function EditMonitorModal({ monitor, onClose, onSaved }) {
                         interval={parseInt(interval, 10)}
                         onTokenChanged={(newToken) => setToken(newToken)}
                     />
+                )}
+
+                {isAdmin && (
+                    <div className="access-section">
+                        <h3 className="access-title">User Access</h3>
+                        <p className="access-hint" style={{ marginBottom: '0.75rem' }}>
+                            Users with role <em>User</em> only see monitors they are granted access to.
+                        </p>
+                        {accessLoading ? (
+                            <p className="access-hint">Loading…</p>
+                        ) : userList.length === 0 ? (
+                            <p className="access-hint">No active users with role 'User' exist.</p>
+                        ) : (
+                            <div className="access-user-list">
+                                {userList.map((u) => (
+                                    <label key={u.id} className="access-user-row">
+                                        <input
+                                            type="checkbox"
+                                            checked={accessIds.has(u.id)}
+                                            onChange={() => toggleAccess(u.id)}
+                                        />
+                                        <span className="access-username">{u.username}</span>
+                                        {u.email && <span className="access-email">{u.email}</span>}
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                        {accessError && <p className="error-msg">{accessError}</p>}
+                        {userList.length > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.75rem' }}>
+                                <button
+                                    className="btn btn-primary"
+                                    onClick={handleSaveAccess}
+                                    disabled={accessSaving}
+                                >
+                                    {accessSaving ? 'Saving…' : 'Save Access'}
+                                </button>
+                                {accessSaved && <span style={{ color: '#22c55e', fontSize: '0.85rem' }}>✓ Saved</span>}
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
         </div>

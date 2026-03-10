@@ -7,6 +7,7 @@ import SetupPage from './pages/SetupPage.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import MonitorDetail from './pages/MonitorDetail.jsx';
 import AdminUsersPage from './pages/AdminUsersPage.jsx';
+import StatusPage from './pages/StatusPage.jsx';
 
 function Layout({ children }) {
   return (
@@ -39,6 +40,7 @@ export default function App() {
               <Layout><AdminUsersPage /></Layout>
             </ProtectedRoute>
           } />
+          <Route path="/status" element={<StatusPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

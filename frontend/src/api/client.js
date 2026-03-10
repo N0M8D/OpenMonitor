@@ -42,7 +42,31 @@ export const getMonitors = () => request('/api/monitors');
 export const createMonitor = (data) => request('/api/monitors', { method: 'POST', body: JSON.stringify(data) });
 export const updateMonitor = (id, data) => request(`/api/monitors/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 export const deleteMonitor = (id) => request(`/api/monitors/${id}`, { method: 'DELETE' });
-export const getChecks = (monitorId) => request(`/api/monitors/${monitorId}/checks`);
+export const getChecks = (monitorId, range) => {
+  const qs = range ? `?range=${encodeURIComponent(range)}` : '';
+  return request(`/api/monitors/${monitorId}/checks${qs}`);
+};
+export const getIncidents = (monitorId) => request(`/api/monitors/${monitorId}/incidents`);
+export const updateIncident = (monitorId, iId, data) =>
+  request(`/api/monitors/${monitorId}/incidents/${iId}`, { method: 'PATCH', body: JSON.stringify(data) });
+export const addIncidentUpdate = (monitorId, iId, data) =>
+  request(`/api/monitors/${monitorId}/incidents/${iId}/updates`, { method: 'POST', body: JSON.stringify(data) });
+export const deleteIncidentUpdate = (monitorId, iId, uId) =>
+  request(`/api/monitors/${monitorId}/incidents/${iId}/updates/${uId}`, { method: 'DELETE' });
+export const getPublicIncidents = () => request('/api/public-incidents');
+export const getStatus = () => request('/api/status');
+export const getActivity = () => request('/api/activity');
+
+// ── Maintenance windows ───────────────────────────────────────────────────────
+export const getMaintenance = (monitorId) => request(`/api/monitors/${monitorId}/maintenance`);
+export const createMaintenance = (monitorId, data) =>
+  request(`/api/monitors/${monitorId}/maintenance`, { method: 'POST', body: JSON.stringify(data) });
+export const updateMaintenance = (monitorId, mwId, data) =>
+  request(`/api/monitors/${monitorId}/maintenance/${mwId}`, { method: 'PATCH', body: JSON.stringify(data) });
+export const stopMaintenance = (monitorId, mwId) =>
+  request(`/api/monitors/${monitorId}/maintenance/${mwId}/stop`, { method: 'POST' });
+export const deleteMaintenance = (monitorId, mwId) =>
+  request(`/api/monitors/${monitorId}/maintenance/${mwId}`, { method: 'DELETE' });
 export const testWebhook = (webhookUrl) => request('/api/webhooks/test', { method: 'POST', body: JSON.stringify({ webhook_url: webhookUrl }) });
 export const regenerateToken = (id) => request(`/api/monitors/${id}/regenerate-token`, { method: 'POST' });
 
